@@ -275,20 +275,68 @@ namespace ObjViewer
             GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, Vector3.one * scale);
 
             if (showPanel) DrawStatsPanel();
+            DrawStartupHint(scale);
 
             GUI.matrix = old;
         }
 
+        /// <summary>进入 Play 后前几秒在屏幕下方显示操作提示（之后自动淡出）。</summary>
+        void DrawStartupHint(float scale)
+        {
+            float t = Time.timeSinceLevelLoad;
+            if (t > 9f) return;
+            float alpha = t < 6.5f ? 1f : Mathf.InverseLerp(9f, 6.5f, t);
+
+            float sw = Screen.width / scale;
+            float sh = Screen.height / scale;
+            float w = Mathf.Min(720f, sw - 40f);
+            float h = 78f;
+            var rect = new Rect(sw * 0.5f - w * 0.5f, sh - h - 26f, w, h);
+
+            string text = "左键拖拽 = 旋转　　右键 / 中键拖拽 = 平移　　滚轮 = 缩放　　← ↑ ↓ → = 旋转\n" +
+                          "1 2 3 4 = 着色模式　空格 = 顶点云　V = 呼吸动画　R = 重置视角　Tab = 收起面板";
+
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                font = _label.font,
+                fontSize = 15,
+                alignment = TextAnchor.MiddleCenter,
+                richText = true,
+            };
+            style.normal.textColor = new Color(0.90f, 0.95f, 1f, alpha);
+
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.DrawTexture(rect, _bg);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(rect.x + 12f, rect.y + 12f, rect.width - 24f, rect.height - 24f), text, style);
+        }
+
         void DrawStatsPanel()
         {
-            float w = 360f, x = 14f, y = 14f;
-            GUILayout.BeginArea(new Rect(x, y, w, 560f), _box);
+            float w = 372f, x = 14f, y = 14f;
+            float scale = Mathf.Clamp(Screen.height / 900f, 0.8f, 2.2f);
+            float availH = Screen.height / scale - 28f;       // 面板高度自适应，避免被 Game 视图裁切
+            GUILayout.BeginArea(new Rect(x, y, w, Mathf.Min(availH, 760f)), _box);
 
             GUILayout.Space(8);
             GUILayout.Label("运行时 OBJ 导入与顶点浏览", _title);
             GUILayout.Space(2);
             GUILayout.Label("Unity " + Application.unityVersion + "  ·  Built-in RP", _hint);
-            GUILayout.Space(8);
+            GUILayout.Space(6);
+
+            // ---- 输入自检放在最上方：拖不动时一眼就能看出卡在哪一环 ----
+            if (_orbit != null)
+            {
+                GUILayout.Label(string.Format("鼠标在 Game 视图内  {0}      已识别到拖拽  {1}",
+                    _orbit.MouseInsideView ? "<color=#7fe0ff>是</color>"
+                                           : "<color=#ff9090>否 ← 鼠标要先移进 Game 窗口</color>",
+                    _orbit.EverReceivedDrag ? "<color=#7fe0ff>是</color>" : "<color=#ff9090>否</color>"), _label);
+                GUILayout.Label(string.Format("鼠标位移 ({0:F0}, {1:F0}) px    按住鼠标键 {2}    相机 yaw {3:F0}° pitch {4:F0}°",
+                    _orbit.LastMouseDelta.x, _orbit.LastMouseDelta.y,
+                    _orbit.IsDragging ? "是" : "否", _orbit.yaw, _orbit.pitch), _hint);
+            }
+
+            GUILayout.Space(6);
 
             if (!_model.IsLoaded)
             {
@@ -342,11 +390,32 @@ namespace ObjViewer
             if (GUILayout.Button("R 重置视角", GUILayout.Height(22))) _orbit.ResetView(_model.ModelBounds);
             GUILayout.EndHorizontal();
 
+            // ---- 视角控制按钮：鼠标拖不动时，直接点这里也能完整浏览 ----
+            GUILayout.Space(4);
+            GUILayout.Label("<b>视角控制</b>（鼠标拖不动时点这些按钮一样能操作）", _label);
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("◀ 左转", GUILayout.Height(24))) _orbit.SetAngles(_orbit.yaw - 30f, _orbit.pitch);
+            if (GUILayout.Button("右转 ▶", GUILayout.Height(24))) _orbit.SetAngles(_orbit.yaw + 30f, _orbit.pitch);
+            if (GUILayout.Button("▲ 抬高", GUILayout.Height(24))) _orbit.SetAngles(_orbit.yaw, _orbit.pitch + 12f);
+            if (GUILayout.Button("▼ 降低", GUILayout.Height(24))) _orbit.SetAngles(_orbit.yaw, _orbit.pitch - 12f);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("放大 +", GUILayout.Height(24))) _orbit.ZoomBy(0.8f);
+            if (GUILayout.Button("缩小 −", GUILayout.Height(24))) _orbit.ZoomBy(1.25f);
+            if (GUILayout.Button(_orbit.autoRotate ? "停止自转" : "自动旋转", GUILayout.Height(24))) _orbit.autoRotate = !_orbit.autoRotate;
+            if (GUILayout.Button("重置视角", GUILayout.Height(24))) _orbit.ResetView(_model.ModelBounds);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label(string.Format("相机  yaw={0:F0}°  pitch={1:F0}°  距离={2:F1}",
+                _orbit.yaw, _orbit.pitch, _orbit.distance), _hint);
+
             if (showHelp)
             {
                 GUILayout.Space(6);
                 GUILayout.Label("<b>操作</b>  左键拖拽=旋转  右键/中键拖拽=平移  滚轮=缩放", _hint);
-                GUILayout.Label("Tab 收起面板   T 自动旋转   +/- 顶点大小   Esc 退出", _hint);
+                GUILayout.Label("方向键=旋转   Tab 收起面板   T 自动旋转   +/- 点大小   Esc 退出", _hint);
             }
 
             GUILayout.Space(6);

@@ -20,9 +20,11 @@ namespace ObjViewer
         public float maxPitch = 89f;
 
         [Header("手感")]
-        public float rotateSpeed = 0.25f;       // 度 / 像素
+        public float rotateDegPerPixel = 0.30f;   // 左键拖拽：度 / 像素
         public float panSpeed = 1f;
-        public float zoomStep = 0.12f;
+        public float panScale = 0.0018f;          // 右键/中键平移系数
+        public float zoomPerNotch = 0.90f;        // 滚轮每格缩放比例
+        public float keyRotateSpeed = 60f;        // 方向键旋转：度 / 秒
         public float damping = 12f;
         public bool autoRotate = false;
         public float autoRotateSpeed = 8f;
@@ -32,7 +34,18 @@ namespace ObjViewer
         float _desiredDistance;
         float _desiredYaw, _desiredPitch;
 
-        bool _dragging;
+        // ---- 输入诊断（面板显示，也方便排查"拖不动"这类问题）----
+        /// <summary>鼠标是否落在 Game 视图范围内。</summary>
+        public bool MouseInsideView { get; private set; }
+        /// <summary>本帧是否按住了鼠标键。</summary>
+        public bool IsDragging { get; private set; }
+        /// <summary>本帧鼠标位移（像素）。</summary>
+        public Vector2 LastMouseDelta { get; private set; }
+        /// <summary>是否曾经成功识别到一次拖拽（用来判断输入到底有没有进来）。</summary>
+        public bool EverReceivedDrag { get; private set; }
+
+        Vector2 _lastMousePos;
+        bool _hasLastMouse;
 
         void Awake()
         {
@@ -45,31 +58,66 @@ namespace ObjViewer
 
         void LateUpdate()
         {
-            // ---- 输入 -------------------------------------------------------
-            if (Input.GetMouseButton(0) && !Input.GetKey(KeyCode.LeftShift))
+            // ================================================================
+            //  输入读取：一律使用 Input.mousePosition / mouseScrollDelta，
+            //  不使用 Input.GetAxis("Mouse X"/"Mouse Y"/"Mouse ScrollWheel")。
+            //  原因：GetAxis 依赖 ProjectSettings/InputManager.asset 里的轴定义，
+            //        轴缺失/被改动/工程重建时静默返回 0 —— 表现就是"拖不动"。
+            //        mousePosition 是原始数据，不受任何轴配置影响。
+            // ================================================================
+            Vector2 mp = Input.mousePosition;
+            MouseInsideView = mp.x >= 0f && mp.y >= 0f && mp.x < Screen.width && mp.y < Screen.height;
+
+            Vector2 delta = Vector2.zero;
+            if (_hasLastMouse)
             {
-                _desiredYaw += Input.GetAxis("Mouse X") * rotateSpeed * 4f;
-                _desiredPitch -= Input.GetAxis("Mouse Y") * rotateSpeed * 4f;
+                delta = mp - _lastMousePos;
+                // 鼠标跳变保护：从窗口外回来时会瞬移，直接丢弃这一帧
+                if (delta.sqrMagnitude > 250000f) delta = Vector2.zero;
+            }
+            _lastMousePos = mp;
+            _hasLastMouse = true;
+            LastMouseDelta = delta;
+
+            bool left = Input.GetMouseButton(0);
+            bool middle = Input.GetMouseButton(2);
+            bool right = Input.GetMouseButton(1);
+            IsDragging = left || middle || right;
+            if (IsDragging && delta.sqrMagnitude > 0.01f) EverReceivedDrag = true;
+
+            // ---- 旋转：左键拖拽（或 左键+Shift 时改为平移）------------------
+            if (left && !Input.GetKey(KeyCode.LeftShift))
+            {
+                _desiredYaw += delta.x * rotateDegPerPixel;
+                _desiredPitch -= delta.y * rotateDegPerPixel;
                 _desiredPitch = Mathf.Clamp(_desiredPitch, minPitch, maxPitch);
             }
-            if (Input.GetMouseButton(0) && Input.GetKey(KeyCode.LeftShift) || Input.GetMouseButton(2))
+
+            // ---- 平移：右键 / 中键（或 左键+Shift）--------------------------
+            if (right || middle || (left && Input.GetKey(KeyCode.LeftShift)))
             {
-                float scale = _desiredDistance * 0.0018f * panSpeed;
-                Vector3 right = transform.right;
-                Vector3 up = transform.up;
-                _desiredTarget -= right * (Input.GetAxis("Mouse X") * scale);
-                _desiredTarget -= up * (Input.GetAxis("Mouse Y") * scale);
-            }
-            if (Input.GetMouseButton(1))
-            {
-                float scale = _desiredDistance * 0.0018f * panSpeed;
-                _desiredTarget -= transform.right * (Input.GetAxis("Mouse X") * scale);
-                _desiredTarget -= transform.up * (Input.GetAxis("Mouse Y") * scale);
+                float s = _desiredDistance * panScale * panSpeed;
+                _desiredTarget -= transform.right * (delta.x * s);
+                _desiredTarget -= transform.up * (delta.y * s);
             }
 
-            float scroll = Input.GetAxis("Mouse ScrollWheel");
-            if (Mathf.Abs(scroll) > 0.0001f)
-                _desiredDistance *= 1f - scroll * 6f * zoomStep;
+            // ---- 缩放：滚轮（mouseScrollDelta.y，向上为正）------------------
+            float scroll = Input.mouseScrollDelta.y;
+            if (Mathf.Abs(scroll) > 1e-4f)
+                _desiredDistance *= Mathf.Pow(zoomPerNotch, scroll);
+
+            // ---- 键盘备用：方向键旋转（万一鼠标不可用也能浏览）--------------
+            float kx = 0f, ky = 0f;
+            if (Input.GetKey(KeyCode.LeftArrow)) kx -= 1f;
+            if (Input.GetKey(KeyCode.RightArrow)) kx += 1f;
+            if (Input.GetKey(KeyCode.UpArrow)) ky += 1f;
+            if (Input.GetKey(KeyCode.DownArrow)) ky -= 1f;
+            if (kx != 0f || ky != 0f)
+            {
+                _desiredYaw += kx * keyRotateSpeed * Time.unscaledDeltaTime;
+                _desiredPitch = Mathf.Clamp(_desiredPitch + ky * keyRotateSpeed * 0.75f * Time.unscaledDeltaTime,
+                                            minPitch, maxPitch);
+            }
 
             _desiredDistance = Mathf.Clamp(_desiredDistance, minDistance, maxDistance);
 
@@ -143,6 +191,12 @@ namespace ObjViewer
                 _desiredYaw = 35f;
                 _desiredPitch = 18f;
             }
+        }
+
+        /// <summary>按比例缩放距离（供 UI 按钮调用）。</summary>
+        public void ZoomBy(float factor)
+        {
+            _desiredDistance = Mathf.Clamp(_desiredDistance * factor, minDistance, maxDistance);
         }
 
         /// <summary>

@@ -8,7 +8,7 @@
   [PASS] mtllib 字段  -> Tiger-class.mtl
   [PASS] 解析出 UV  -> 31579 个
   [PASS] 解析出法线  -> 9598 个
-  文件解析耗时: 95 ms
+  文件解析耗时: 99 ms
   [PASS] 所有面索引都指向合法顶点（无越界）  -> 越界 0 个
   [PASS] UV / 法线索引合法  -> 越界 UV 0 / 法线 0
   [PASS] 面全部三角化（角点数能被 3 整除）
@@ -46,7 +46,7 @@
   相机位置: (-4.2, 18.2, -449.0)  距离=449.0
   [PASS] 渲染 MaterialColor  -> render_materialcolor.png (71403 B)
   [PASS] 渲染 HeightGradient  -> render_heightgradient.png (77709 B)
-  [PASS] 渲染 NormalColor  -> render_normalcolor.png (76551 B)
+  [PASS] 渲染 NormalColor  -> render_normalcolor.png (76554 B)
   [PASS] 渲染 Wireframe  -> render_wireframe.png (90076 B)
   [PASS] 渲染顶点云  -> render_vertexpointcloud.png
 
