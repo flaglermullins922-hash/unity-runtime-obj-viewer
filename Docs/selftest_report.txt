@@ -1,0 +1,53 @@
+================ OBJ Viewer 自测报告 ================
+模型: Assets/StreamingAssets/models/Tiger-class.obj
+
+--- 1) 文本解析 ---
+  [PASS] 解析出顶点(v 行)  -> 33974 个
+  [PASS] 解析出子网格  -> 14 个
+  [PASS] 解析出三角面  -> 49489 个
+  [PASS] mtllib 字段  -> Tiger-class.mtl
+  [PASS] 解析出 UV  -> 31579 个
+  [PASS] 解析出法线  -> 9598 个
+  文件解析耗时: 95 ms
+  [PASS] 所有面索引都指向合法顶点（无越界）  -> 越界 0 个
+  [PASS] UV / 法线索引合法  -> 越界 UV 0 / 法线 0
+  [PASS] 面全部三角化（角点数能被 3 整除）
+
+--- 2) 构建 Unity Mesh ---
+  [PASS] ObjModel 加载成功  -> 无错误
+  [PASS] 子网格数量一致  -> 14 / 14
+  [PASS] Mesh 顶点总数  -> 69,241
+  [PASS] 三角面总数一致  -> 49489 / 49489
+  [PASS] 每个子网格都有几何数据与顶点映射表
+
+--- 3) 顶点访问 API ---
+  [PASS] GetAllVertices() 数量正确  -> 69,241
+  [PASS] SourceVertices 暴露原始 v 行  -> 33,974
+  [PASS] 顶点可写：SetAllVertices -> GetAllVertices 往返一致
+  [PASS] 顶点色可写：SetAllColors -> GetAllColors 往返一致
+  [PASS] 遍历顶点求极值 OK  -> 最高 y=56.103 最低 y=-19.753
+  [PASS] 按顶点撒点 OK  -> 200 个点
+  包围盒: (573.18, 75.86, 182.40)  中心 (-4.18, 18.18, 0.00)
+
+--- 4) 四种着色模式 ---
+  [PASS] 找到 shader ObjViewer/SurfaceLambert
+  [PASS] 找到 shader ObjViewer/VertexPoint
+  [PASS] 模式 MaterialColor 顶点色数量正确  -> 69,241
+  [PASS]   材质色模式（颜色来自调色板/mtl，顶点色保持白）
+  [PASS] 模式 HeightGradient 顶点色数量正确  -> 69,241
+  [PASS]   顶点色被重写 = True
+  [PASS] 模式 NormalColor 顶点色数量正确  -> 69,241
+  [PASS]   顶点色被重写 = True
+  [PASS] 模式 Wireframe 顶点色数量正确  -> 69,241
+  [PASS]   顶点色被重写 = True
+
+--- 5) 真实渲染截图 ---
+  [PASS] 相机取景距离合理  -> 449.0
+  相机位置: (-4.2, 18.2, -449.0)  距离=449.0
+  [PASS] 渲染 MaterialColor  -> render_materialcolor.png (71403 B)
+  [PASS] 渲染 HeightGradient  -> render_heightgradient.png (77709 B)
+  [PASS] 渲染 NormalColor  -> render_normalcolor.png (76551 B)
+  [PASS] 渲染 Wireframe  -> render_wireframe.png (90076 B)
+  [PASS] 渲染顶点云  -> render_vertexpointcloud.png
+
+================ 结束: PASS=36  FAIL=0 ================
