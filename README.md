@@ -19,7 +19,7 @@
 | 渲染管线 | Built-in RP |
 | 演示模型 | Tiger-class.obj（33,974 个顶点 / 49,489 个三角面 / 14 个子网格） |
 | 实测解析+建网格耗时 | **94 ~ 400 ms**（含 3.8 MB 文本解析与 Mesh 构建） |
-| 自动化自测 | 36 项断言全部通过（见 [第六节](#六自动化自测)） |
+| 自动化自测 | 42 项断言全部通过（见 [第六节](#六自动化自测)） |
 | 演示视频 | 由本人录屏提交，**不含在本仓库内**（录屏脚本见 [第七节](#七运行演示与录屏)） |
 
 ---
@@ -69,7 +69,7 @@ Assets/
 │   │   └── VertexAccessExamples.cs  #   顶点访问示例集（未来功能的模板）
 │   └── Editor/                      # 仅编辑器用
 │       ├── ObjViewerSceneBuilder.cs #   一键生成演示场景 + Build Settings
-│       ├── ObjViewerSelfTest.cs     #   36 项自动化自测（解析/API/渲染出图）
+│       ├── ObjViewerSelfTest.cs     #   42 项自动化自测（解析/API/渲染/启动流程）
 │       └── DemoVideoRecorder.cs     #   逐帧渲染 20 秒演示视频（管道喂给 ffmpeg）
 ├── Shaders/
 │   ├── SurfaceLambert.shader        #   顶点色 + 半兰伯特 + 边缘光
@@ -185,13 +185,18 @@ Unity.exe -batchmode -quit -projectPath <项目路径> \
   -logFile selftest.log
 ```
 
-覆盖 36 项断言，全部通过（报告见 [`Docs/selftest_report.txt`](Docs/selftest_report.txt)）：
+覆盖 42 项断言，全部通过（报告见 [`Docs/selftest_report.txt`](Docs/selftest_report.txt)）：
 
 * **文本解析**：顶点/UV/法线/三角面数量、索引越界检查、多边形三角化完整性
 * **建 Mesh**：子网格数、顶点数、三角面数一致性、顶点映射表
 * **顶点 API**：`GetAllVertices` 数量、**写入→读回 往返一致性**、顶点色往返、极值/撒点示例
 * **着色模式**：4 种模式的顶点色数量与内容
 * **真实渲染**：渲染出 5 张 PNG 并校验文件有效（`Docs/render_*.png`）
+* **控制器启动流程**：`Initialize()` 全程无异常、模型已加载、`LoadError` 为空、顶点云与相机控制器已创建、相机角度驱动通路可用
+
+> 最后一组断言是专门为一次真实踩坑补上的：`ObjModel.Load()` 是**同步**的，会在 `OnModelLoaded` 回调里
+> 立即执行，所以顶点云组件必须在 `Load()` **之前**创建，否则回调里空引用、并被误报成「加载失败」。
+> 自测原本只覆盖 `ObjModel`，没走控制器的完整启动路径，因此漏掉了这个问题 —— 现在补上了。
 
 ---
 

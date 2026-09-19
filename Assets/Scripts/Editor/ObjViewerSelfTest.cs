@@ -279,6 +279,42 @@ namespace ObjViewer.EditorTools
             Render(cam, fp, cloud);
             Check(File.Exists(fp) && new FileInfo(fp).Length > 2000, "渲染顶点云", Path.GetFileName(fp));
 
+            // ---------------------------------------------------- 6. 控制器启动流程
+            Sb.AppendLine();
+            Sb.AppendLine("--- 6) ObjViewerController 完整启动流程（等价于 Play 时的 Awake）---");
+            var ctrlGO = new GameObject("[SelfTestController]");
+            var ctrl = ctrlGO.AddComponent<ObjViewerController>();
+            ctrl.modelFileName = "Tiger-class.obj";
+
+            System.Exception initEx = null;
+            try
+            {
+                ctrl.Initialize();     // Awake 调用的就是这个
+            }
+            catch (System.Exception e)
+            {
+                initEx = e;
+            }
+            Check(initEx == null, "Initialize() 全程无异常",
+                initEx == null ? "" : initEx.GetType().Name + ": " + initEx.Message);
+            Check(ctrl.Model != null && ctrl.Model.IsLoaded, "控制器内的模型已加载");
+            Check(string.IsNullOrEmpty(ctrl.Model != null ? ctrl.Model.LoadError : "model==null"),
+                "LoadError 为空（不再误报「加载失败」）",
+                ctrl.Model != null ? (ctrl.Model.LoadError ?? "(null)") : "(model==null)");
+            Check(ctrl.Cloud != null, "顶点云组件已创建");
+            Check(ctrl.Orbit != null, "相机控制器已创建");
+
+            // 模拟一次「拖动」：直接驱动相机角度，验证朝向真的会变（拖拽逻辑通路）
+            float yawBefore = ctrl.Orbit.yaw;
+            ctrl.Orbit.SetAngles(yawBefore + 40f, ctrl.Orbit.pitch);
+            ctrl.Orbit.ApplyImmediately();
+            float yawAfter = ctrl.Orbit.yaw;
+            Check(Mathf.Abs(Mathf.DeltaAngle(yawBefore, yawAfter)) > 1f,
+                "相机角度驱动通路可用（拖拽 → 视角变化）",
+                string.Format("{0:F1}° → {1:F1}°", yawBefore, yawAfter));
+
+            Object.DestroyImmediate(ctrlGO);
+
             Sb.AppendLine();
             Sb.AppendLine("================ 结束: PASS=" + _pass + "  FAIL=" + _fail + " ================");
             Debug.Log(Sb.ToString());

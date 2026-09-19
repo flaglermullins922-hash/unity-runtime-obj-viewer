@@ -41,11 +41,27 @@ namespace ObjViewer
 
         void Awake()
         {
+            Initialize();
+        }
+
+        /// <summary>
+        /// 初始化全部运行环境。Awake 会自动调用，也可由脚本/自测手动调用。
+        /// （编辑器非 Play 模式下 AddComponent 不会触发 Awake，手动调用入口是必要的）
+        /// </summary>
+        public void Initialize()
+        {
             SetupRenderEnvironment();
             SetupCamera();
             SetupLights();
             SetupModel();
         }
+
+        /// <summary>当前模型（供外部脚本访问）。</summary>
+        public ObjModel Model => _model;
+        /// <summary>顶点云组件。</summary>
+        public VertexPointCloud Cloud => _cloud;
+        /// <summary>相机控制器。</summary>
+        public OrbitCameraController Orbit => _orbit;
 
         void SetupRenderEnvironment()
         {
@@ -119,23 +135,32 @@ namespace ObjViewer
             _model = mgo.AddComponent<ObjModel>();
             _model.modelFile = modelFileName;
             _model.loadOnStart = false;
-            _model.Loaded += OnModelLoaded;
-            _model.Load(modelFileName);
 
+            // ⚠ 顺序很重要：ObjModel.Load() 是【同步】的，构建完 Mesh 会立刻触发 Loaded 事件，
+            //   而回调 OnModelLoaded 里要用到 _cloud。所以顶点云必须在 Load() 之前创建，
+            //   否则回调里 _cloud 还是 null → NullReferenceException。
             _cloud = gameObject.AddComponent<VertexPointCloud>();
             _cloud.model = _model;
             _cloud.visible = false;
+
+            _model.Loaded += OnModelLoaded;
+            _model.Load(modelFileName);
         }
 
         void OnModelLoaded(ObjModel m)
         {
+            if (m == null) return;
             BuildGroundGrid(m.ModelBounds);
             if (_orbit != null)
             {
                 _orbit.ResetView(m.ModelBounds);
                 _orbit.pivot = null;
             }
-            _cloud.Refresh();
+            if (_cloud != null)
+            {
+                _cloud.model = m;
+                _cloud.Refresh();
+            }
         }
 
         /// <summary>地面参考网格：让浏览时有空间参照（不是模型的一部分）。</summary>

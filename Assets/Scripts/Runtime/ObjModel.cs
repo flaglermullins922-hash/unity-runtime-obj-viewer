@@ -160,7 +160,16 @@ namespace ObjViewer
                     "[ObjModel] 加载完成: {0}  顶点(v行)={1}  Mesh顶点={2}  三角面={3}  子网格={4}  耗时={5} ms",
                     Path.GetFileName(absolutePath), SourceVertexCount, MeshVertexCount,
                     TriangleCount, Parts.Length, LoadMilliseconds));
-                Loaded?.Invoke(this);
+
+                // 事件回调单独保护：回调里的异常不应该被误报成「加载失败」
+                try
+                {
+                    Loaded?.Invoke(this);
+                }
+                catch (Exception cbEx)
+                {
+                    UnityEngine.Debug.LogError("[ObjModel] Loaded 事件回调中发生异常: " + cbEx);
+                }
             }
             catch (Exception e)
             {
